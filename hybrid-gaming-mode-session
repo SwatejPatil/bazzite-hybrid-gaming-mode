@@ -1,0 +1,29 @@
+#!/usr/bin/bash
+# Gaming Mode for hybrid laptops (integrated GPU + NVIDIA).
+#
+# gamescope runs on the integrated GPU, which is wired to the laptop screen and the
+# HDMI port. Each game renders on the NVIDIA GPU (PRIME offload, set per game in
+# Steam's launch options) and hands its frames back to gamescope.
+#
+# Settings live in /usr/local/etc/hybrid-gaming-mode.conf (written by install.sh).
+
+IGPU_ID=""
+WIDTH=1920
+HEIGHT=1080
+CURSOR_SCALE_HEIGHT=""
+CONF=/usr/local/etc/hybrid-gaming-mode.conf
+# shellcheck source=/dev/null
+[ -r "$CONF" ] && . "$CONF"
+
+mkdir -p "$HOME/.local/state"
+export GAMING_SESSION_ID="${XDG_SESSION_ID:-}"
+
+args=(-e -W "$WIDTH" -H "$HEIGHT")
+[ -n "$IGPU_ID" ] && args+=(--prefer-vk-device "$IGPU_ID")
+[ -n "$CURSOR_SCALE_HEIGHT" ] && args+=(--cursor-scale-height "$CURSOR_SCALE_HEIGHT")
+
+# When Steam exits, end the login session too. Otherwise gamescope can outlive
+# Steam and leave a blank screen instead of returning to the login screen.
+exec gamescope "${args[@]}" -- \
+    bash -c 'steam -gamepadui; [ -n "$GAMING_SESSION_ID" ] && loginctl terminate-session "$GAMING_SESSION_ID"' \
+    > "$HOME/.local/state/gamescope-session.log" 2>&1
